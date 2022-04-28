@@ -8,18 +8,12 @@ class Interprete {
   }
 
   analize(node) {
+    this.bloques.push(new BloqueRun('global',-1,-1,[],[],[]));
+    let blockFound = this.foundFunction('global',-1,-1,this.bloques);
     if (node === undefined || node === null) return;
     for (let i = 0; i < node.length; i++) {
       if (node[i] instanceof Variable) {
-        if (node[i].tipo_dec === "NORMAL") {
-          //console.log("Hola con Variable normal");
-        } else if (node[i].tipo_dec === "SINGLE_ARRAY") {
-          //console.log("Hola con arreglo");
-        } else if (node[i].tipo_dec === "DOUBLE_ARRAY") {
-          //console.log("Hola con arreglo doble");
-        } else {
-          //console.log("Hola con Asignacion");
-        }
+        this.variableDeclaration(node[i],this.bloques,blockFound,-1,-1);
       } else if (node[i] instanceof Llamada) {
         console.log(node[i]);
         if(node[i].tipo === 'RUN'){
@@ -30,10 +24,12 @@ class Interprete {
                 for(let l = 0; l < node[j].parametros.length; l++){
                   tempArguments.push(new VariableRun(node[j].parametros[l].tipo_dec,node[j].parametros[l].id,null,'variable'));
                 }
-                this.bloques.push(new BloqueRun(node[j].id,node[j].fila,node[j].columna,tempArguments,[],node[j].parametros));
+                let newBlock = new BloqueRun(node[j].id,node[j].fila,node[j].columna,tempArguments,[],node[j].parametros);
+                this.addBlock(this.bloques,-1,-1,newBlock);
                 for (let l = 0; l < node[j].bloque.Instrucciones.length; l++) {
                   this.runInstructions(node[j].id,node[j].fila,node[j].columna,node[j].bloque.Instrucciones[l],this.bloques);
                 }
+                break;
               }else{continue;}
             }else{continue;}
           }
@@ -52,10 +48,11 @@ class Interprete {
           }
         }*/
       } else if (node[i] instanceof Imprimir) {
-        if(instruction === 'print'){
-          this.consoleText += this.printText(node[i].valor,blockRow,blockCol,blockArray); 
+        if(node[i].tipo === 'print'){
+          this.consoleText += this.printText(node[i].valor,-1,-1,this.bloques); 
         }else{
-          this.consoleText += this.printText(node[i].valor,blockRow,blockCol,blockArray) + "\n";
+          console.log("Entra aqui pana");
+          this.consoleText += this.printText(node[i].valor,-1,-1,this.bloques) + "\n";
         }
       } else{continue;}
     }
@@ -63,321 +60,10 @@ class Interprete {
 
   runInstructions(blockId,blockRow,blockCol,instruction,blockArray) {
     let blockFound = this.foundFunction(blockId,blockRow,blockCol,blockArray);
-    //console.log(blockFound);
     if (instruction instanceof Variable) {
-        if (instruction.tipo_dec === "NORMAL") {
-          let found = null;
-          for (let i = 0; i < blockArray.length; i++) {
-            if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value[0].valor,blockRow,blockCol) !== null){
-              found = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value[0].valor,blockRow,blockCol);
-              break;
-            }
-          }
-          if (found === null) {
-            let newVariable = new VariableRun(instruction.tipo_var, instruction.value[0].valor, null, 'variable');
-            this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-          }else{
-            console.log("Error: La variable " + instruction.tipo_var[0].valor + " ya ha sido declarada anteriormente");
-          }
-        } else if (instruction.tipo_dec === "SINGLE_ARRAY") {
-          let found = null;
-          for (let i = 0; i < blockArray.length; i++) {
-            if(this.foundVariable(blockArray[i],[],instruction.value[0].valor,blockRow,blockCol) !== null){
-              found = this.foundVariable(blockArray[i],[],instruction.value[0].valor,blockRow,blockCol);
-              break;
-            }
-          }
-          if (found === null) {
-            let newVariable = new VariableRun(instruction.tipo_var, instruction.value[0].valor, null, 'array');
-            this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-          }else{
-            console.log("Error: La variable " + instruction.tipo_var[0].valor + " ya ha sido declarada anteriormente");
-          }
-        } else if (instruction.tipo_dec === "DOUBLE_ARRAY") {
-          let found = null;
-          for (let i = 0; i < blockArray.length; i++) {
-            if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value[0].valor,blockRow,blockCol) !== null){
-              found = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value[0].valor,blockRow,blockCol);
-              break;
-            }
-          }
-          if (found === null) {
-            let newVariable = new VariableRun(instruction.tipo_var, instruction.value[0].valor, null, 'array_doble');
-            this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-          }else{
-            console.log("Error: La variable " + instruction.tipo_var[0].valor + " ya ha sido declarada anteriormente");
-          }
-        } else {
-          let found = null;
-          for (let i = 0; i < blockArray.length; i++) {
-            if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.tipo_var[0].valor,blockRow,blockCol) !== null){
-              found = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.tipo_var[0].valor,blockRow,blockCol);
-              break;
-            }
-          }
-          //console.log(found);
-          if (found === null) {
-            if (instruction.value instanceof OperacionSimplificada) {
-              if(found !== null){
-                if(found.valor !== null){
-                  if (found.tipo === "int" || found.tipo === "double") {
-                    if (instruction.value.tipo === "++") {
-                      found.valor = found.valor + 1;
-                    } else {
-                      found.valor = found.valor - 1;
-                    }
-                  } else {
-                    console.log(
-                      "Error en aumentar cantidad en una variable no numérica"
-                    );
-                  }
-                }else{
-                  console.log("Error: La variable a la que le quiere cambiar su valor es nula, debe inicializarla");
-                }
-              }else{
-                console.log("Error: La variable a la que le quiere cambiar su valor no existe");
-              }
-            } else {
-              //Asignacion
-              if (instruction.value.tipo_asg === "NORMAL") {
-                if (instruction.value.value instanceof Operacion) {
-                  if(instruction.tipo_var === 'int' || instruction.tipo_var === 'double'){
-                    let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.arithmetic(instruction.value.value),'variable');
-                    this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                  }else if(instruction.tipo_var === 'string'){
-                    let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.printText(instruction.value.value),'variable');
-                    this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                  } else{
-                    console.log("Error: Está intentando asignar contenidos de tipo incorrectos en variables");
-                  }
-                } else if(instruction.value.value instanceof Negativo) {
-                  if(instruction.tipo_var === 'int' || instruction.tipo_var === 'double'){
-                    let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.arithmetic(instruction.value.value),'variable');
-                    this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                  } else{
-                    console.log("Error: Solo puede asignar valores numéricos a variables numéricas");
-                  }
-                } else if(instruction.value.value instanceof Valor){
-                  if(instruction.value.value.tipo === instruction.tipo_var){
-                    let valueToAssign = null;
-                    if(instruction.tipo_var === 'int'){valueToAssign = parseInt(instruction.value.value.valor);}
-                    else if(instruction.tipo_var === 'string' || instruction.tipo_var === 'char'){valueToAssign = instruction.value.value.valor.toString();}
-                    else if(instruction.tipo_var === 'boolean'){valueToAssign = (instruction.value.value.valor === 'true');}
-                    else if(instruction.tipo_var === 'double'){valueToAssign = parseFloat(instruction.value.value.valor);}
-                    let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, valueToAssign, 'variable');
-                    //console.log(blockFound);
-                    this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                  } else{
-                    console.log("El valor asignado no corresponde con el tipo de variable");
-                  }
-                } else if(instruction.value.value instanceof OperacionSimplificada){
-                  let found2 = null;
-                  for (let i = 0; i < blockArray.length; i++) {
-                    if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor,blockRow,blockCol) !== null){
-                      found2 = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor,blockRow,blockCol);
-                      break;
-                    }
-                  }
-                  if(found2 !== null){
-                    if (instruction.tipo_var === "int" || instruction.tipo_var === "double") {
-                      if (found2.tipo === "int" || instruction.tipo === "double") {
-                        if (instruction.value.value.tipo === "++") {
-                          instruction.value.value = found2.valor + 1;
-                        } else {
-                          instruction.value.value = found2.valor - 1;
-                        }
-                        let newVariable = new VariableRun(instruction.tipo_var, instruction.value.value.tipo_var[0].valor, instruction.value.value,'variable');
-                        this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                      } else {
-                        console.log("Error: La variable que llamó para aumentar el valor no es numérica");
-                      }
-                    } else {
-                    console.log("Error: La variable en la que desea aumentar el valor no es numérica");
-                    }
-                  }else{
-                    console.log("Error: El id " + instruction.value.value.valor + " no existe");
-                  }
-                } else if(instruction.value.value instanceof Casteo){
-                  let found2 = null;
-                  for (let i = 0; i < blockArray.length; i++) {
-                    if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor.valor,blockRow,blockCol) !== null){
-                      found2 = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor.valor,blockRow,blockCol);
-                      break;
-                    }
-                  }
-                  if(found2 !== null){
-                    if (instruction.tipo_var === instruction.value.value.tipo) {
-                      //int a string
-                      if(instruction.value.value.tipo === 'string' && found2.tipo === 'int'){
-                        let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, found2.valor.toString(),'variable');
-                        this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                        console.log("Variable casteada de int a string");
-                      //int a double
-                      } else if(instruction.value.value.tipo === 'double' && found2.tipo === 'int'){
-                        let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor,(found2.valor).toFixed(1),'variable');
-                        this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                        console.log("Variable casteada de int a double");
-                      //double a int
-                      } else if(instruction.value.value.tipo === 'int' && found2.tipo === 'double'){
-                        let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor,parseInt(found2.valor, 10),'variable');
-                        this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                        console.log("Variable casteada de double a int");
-                      //double a string
-                    } else if(instruction.value.value.tipo === 'string' && found2.tipo === 'double'){
-                      let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor,found2.valor.toString(),'variable');
-                      this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                      console.log("Variable casteada de double a string");
-                    }
-                    } else {
-                      console.log("Error: Quiere asignar un casteo de una variable tipo " + instruction.value.value.tipo + " en una tipo " + instruction.tipo_var);
-                    }
-                  }else{
-                    console.log("Error: El id " + instruction.value.value.valor + " no existe");
-                  }
-                } else if(instruction.value.value instanceof nuevoArraySimple){
-                  console.log("Error: No puede asignar un vector simple a una variable normal");
-                } else if(instruction.value.value instanceof nuevoArrayDoble){
-                  console.log("Error: No puede asignar un vector doble a una variable normal");
-                } else if(instruction.value.value instanceof NuevoArray){
-                  console.log("Error: No puede asignar una lista a una variable normal");
-                } else if(instruction.value.value instanceof AccesoArraySimple){
-                } else if(instruction.value.value instanceof AccesoArrayDoble){
-                } else if(instruction.value.value instanceof Operador){
-                  console.log("Error: No puede asignar un operador a una variable");
-                } else if(instruction.value.value instanceof Negacion){
-                  console.log("Error: No puede asignar un operador a una variable");
-                } else if(instruction.value.value instanceof Relacional){
-                  console.log("Error: No puede asignar una relación a una variable");
-                } else if(instruction.value.value instanceof Id){
-                  let found2 = null;
-                  for (let i = 0; i < blockArray.length; i++) {
-                    if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor,blockRow,blockCol) !== null){
-                      found2 = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor,blockRow,blockCol);
-                      break;
-                    }
-                  }
-                  if(found2 !== null){
-                    if(found2.tipo === instruction.tipo_var){
-                      let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, found2.valor,'variable');
-                      this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                    }else{
-                      console.log("Error: Quiere asignar una variable tipo " + found2.tipo + " en una tipo " + instruction.tipo_var);
-                    }
-                  }else{
-                    console.log("Error: El id " + instruction.value.value.valor + " no existe");
-                  }
-                }
-              } else if (instruction.value.tipo_asg === "SINGLE_ARRAY") {
-                if (instruction.value.value instanceof Operacion) {
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof Negativo) {
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof Valor){
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof OperacionSimplificada){
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof Casteo){
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof nuevoArraySimple){
-                  if(instruction.tipo_var === instruction.value.value.tipo){
-                    let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.fillDefaultArray(instruction.tipo_var,instruction.value.value.expresion.valor),'array');
-                    this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                  } else{
-                    console.log("Error: Está asignando un vector " + instruction.value.value.tipo + " a uno " + instruction.tipo_var);
-                  }
-                } else if(instruction.value.value instanceof nuevoArrayDoble){
-                  console.log("Error: No puede asignar un vector doble a un vector simple");
-                } else if(instruction.value.value instanceof NuevoArray){
-                } else if(instruction.value.value instanceof AccesoArraySimple){
-                } else if(instruction.value.value instanceof AccesoArrayDoble){
-                } else if(instruction.value.value instanceof Operador){
-                  console.log("Error: No puede asignar un operador a un vector");
-                } else if(instruction.value.value instanceof Negacion){
-                  console.log("Error: No puede asignar un operador a una vector");
-                } else if(instruction.value.value instanceof Relacional){
-                  console.log("Error: No puede asignar una relación a una vector");
-                } else if(instruction.value.value instanceof Id){
-                  let found2 = null;
-                  for (let i = 0; i < blockArray.length; i++) {
-                    if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor,blockRow,blockCol) !== null){
-                      found2 = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor,blockRow,blockCol);
-                      break;
-                    }
-                  }
-                  if(found2 !== null){
-                    if(found2.tipo === instruction.tipo_var){
-                      let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, found2.valor,'variable');
-                      this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                    }else{
-                      console.log("Error: Quiere asignar una variable tipo " + found2.tipo + " en una tipo " + instruction.tipo_var);
-                    }
-                  }else{
-                    console.log("Error: El id " + instruction.value.value.valor + " no existe");
-                  }
-                }
-              } else if (instruction.value.tipo_asg === "DOUBLE_ARRAY") {
-                if (instruction.value.value instanceof Operacion) {
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof Negativo) {
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof Valor){
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof OperacionSimplificada){
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof Casteo){
-                  console.log("Error: No puede asignar un solo valor a un vector");
-                } else if(instruction.value.value instanceof nuevoArraySimple){
-                  console.log("Error: No puede asignar un vector simple a un vector doble");
-                } else if(instruction.value.value instanceof nuevoArrayDoble){
-                  if(instruction.tipo_var === instruction.value.value.tipo){
-                    let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.fillDefaultArray(instruction.tipo_var,instruction.value.value.expresion1.valor) ,'array');
-                    this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                  } else{
-                    console.log("Error: Está asignando un vector " + instruction.value.value.tipo + " a uno " + instruction.tipo_var);
-                  }
-                } else if(instruction.value.value instanceof NuevoArray){
-                  console.log("Error: No puede asignar una lista a un vector doble");
-                } else if(instruction.value.value instanceof AccesoArraySimple){
-                } else if(instruction.value.value instanceof AccesoArrayDoble){
-                } else if(instruction.value.value instanceof Operador){
-                  console.log("Error: No puede asignar un operador a un vector");
-                } else if(instruction.value.value instanceof Negacion){
-                  console.log("Error: No puede asignar un operador a una vector");
-                } else if(instruction.value.value instanceof Relacional){
-                  console.log("Error: No puede asignar una relación a una vector");
-                } else if(instruction.value.value instanceof Id){
-                  let found2 = null;
-                  for (let i = 0; i < blockArray.length; i++) {
-                    if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor,blockRow,blockCol) !== null){
-                      found2 = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.value.value.valor,blockRow,blockCol);
-                      break;
-                    }
-                  }
-                  if(found2 !== null){
-                    if(found2.tipo === instruction.tipo_var){
-                      let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, found2.valor,'variable');
-                      this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-                    }else{
-                      console.log("Error: Quiere asignar una variable tipo " + found2.tipo + " en una tipo " + instruction.tipo_var);
-                    }
-                  }else{
-                    console.log("Error: El id " + instruction.value.value.valor + " no existe");
-                  }
-                }
-              }
-            }
-          }else{
-            console.log("Error: La variable " + instruction.value.tipo_var[0].valor + " ya ha sido declarada anteriormente");
-          }
-        }
+      this.variableDeclaration(instruction,blockArray,blockFound,blockRow,blockCol);
     } else if (instruction instanceof Asignacion) {
-      let found = null;
-      for (let i = 0; i < blockArray.length; i++) {
-        if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.tipo_var[0].valor,blockRow,blockCol) !== null){
-          found = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.tipo_var[0].valor,blockRow,blockCol);
-          break;
-        }
-      }
+      let found = this.generalFoundVariable(blockArray,instruction.tipo_var[0].valor,blockRow,blockCol);
       if (found !== null) {
         if(instruction.tipo_asg === 'NORMAL'){
           if(instruction.value.tipo === found.tipo){
@@ -393,17 +79,9 @@ class Interprete {
         } else if(instruction.tipo_asg === 'SINGLE_ARRAY'){
         } else if(instruction.tipo_asg === 'DOUBLE_ARRAY'){
         }
-      }else{
-        console.log("Error: La variable " + instruction.tipo_var[0].valor + " aún no se ha declarado");
-      }
+      }else{console.log("Error: La variable " + instruction.tipo_var[0].valor + " aún no se ha declarado");}
     } else if (instruction instanceof OperacionSimplificada) {
-      let found = null;
-      for (let i = 0; i < blockArray.length; i++) {
-        if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.valor,blockRow,blockCol) !== null){
-          found = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.valor,blockRow,blockCol);
-          break;
-        }
-      }
+      let found = this.generalFoundVariable(blockArray,instruction.valor,blockRow,blockCol);
       if (found !== null) {
         if (found.tipo === "int" || found.tipo === "double") {
           if (instruction.tipo === "++") {
@@ -411,12 +89,8 @@ class Interprete {
           } else {
             found.valor = found.valor - 1;
           }
-        } else {
-          console.log("Error: La variable a la que quiere cambiar su cantidad, no es numérica");
-        }
-      }else{
-        console.log("Error: La variable a la que le quiere cambiar el valor, aún no está declarada");
-      }
+        } else{console.log("Error: La variable a la que quiere cambiar su cantidad, no es numérica");}
+      }else{console.log("Error: La variable a la que le quiere cambiar el valor, aún no está declarada");}
     } else if (instruction instanceof Llamada) {
       if(this.foundFunction(instruction.id)){
         let returned = this.returnFunction(instruction.id);
@@ -462,13 +136,7 @@ class Interprete {
       this.addBlock(blockArray,blockFound.fila,blockFound.columna,newBlock);
       if(instruction.variable instanceof Variable){
         if(instruction.variable.tipo_dec === 'ASIGNACION'){
-          let found = null;
-          for (let i = 0; i < blockArray.length; i++) {
-            if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction.variable.value.tipo_var[0].valor,blockRow,blockCol) !== null){
-              found = this.foundVariable(blockArray[i],blockArray[i].variables,instruction.variable.value.tipo_var[0].valor,blockRow,blockCol);
-              break;
-            }
-          }
+          let found = this.generalFoundVariable(blockArray,instruction.variable.value.tipo_var[0].valor,blockRow,blockCol);
           if(found === null){
             if(instruction.variable.value.value instanceof Valor){
               if(instruction.variable.value.value.tipo === instruction.variable.tipo_var){
@@ -591,9 +259,6 @@ class Interprete {
           let newBlock = new BloqueRun('while',instruction.fila,instruction.columna,[],[],[]);
           this.addBlock(blockArray,blockFound.fila,blockFound.columna,newBlock);
         }
-        //let valor1 = new Valor(found.tipo,counter);
-        //let valor2 = new Valor(instruction.expresion.value2.tipo,instruction.expresion.value2.valor)
-        //let comparable = new Relacional(valor1,valor2,instruction.expresion.type);
         if(!this.relational(instruction.expresion,instruction.fila,instruction.columna,blockArray)){break;}
         for (let i = 0; i < instruction.bloque.Instrucciones.length; i++) {
           let returned = this.runInstructions('while',instruction.fila,instruction.columna,instruction.bloque.Instrucciones[i],blockArray);
@@ -625,7 +290,6 @@ class Interprete {
           break;
         }else{continue;}
       }
-
       for (let i = 0; i < blockArray.length; i++) {
         if(this.removeBlock(blockArray[i],instruction.fila,instruction.columna)){
           break;
@@ -634,9 +298,6 @@ class Interprete {
       while(true){
         let newBlock = new BloqueRun('dowhile',instruction.fila,instruction.columna,[],[],[]);
         this.addBlock(blockArray,blockFound.fila,blockFound.columna,newBlock);
-        //let valor1 = new Valor(found.tipo,counter);
-        //let valor2 = new Valor(instruction.expresion.value2.tipo,instruction.expresion.value2.valor)
-        //let comparable = new Relacional(valor1,valor2,instruction.expresion.type);
         if(!this.relational(instruction.expresion,instruction.fila,instruction.columna,blockArray)){break;}
         for (let i = 0; i < instruction.bloque.Instrucciones.length; i++) {
           this.runInstructions('dowhile',instruction.fila,instruction.columna,instruction.bloque.Instrucciones[i],blockArray);
@@ -658,8 +319,8 @@ class Interprete {
         let returned = this.returnValue(instruction.bloque[i].expresion,instruction.fila,instruction.columna,blockArray);
         if(instruction.bloque[i].tipo === 'CASE'){
           if(returned !== null){
-            console.log(principal === returned);
-            if(principal === returned){
+            console.log(principal.value === returned.value);
+            if(principal.value === returned.value){
               for (let j = 0; j < instruction.bloque[i].bloque.Instrucciones.length; j++) {
                 let newBlock2 = new BloqueRun('case',instruction.bloque[i].bloque.fila,instruction.bloque[i].bloque.columna,[],[],[]);
                 this.addBlock(blockArray,instruction.fila,instruction.columna,newBlock2);
@@ -691,7 +352,7 @@ class Interprete {
     } else if (instruction instanceof Continue) {
       return instruction;
     } else if (instruction instanceof Imprimir) {
-      if(instruction === 'print'){
+      if(instruction.tipo === 'print'){
         this.consoleText += this.printText(instruction.valor,blockRow,blockCol,blockArray); 
       }else{
         this.consoleText += this.printText(instruction.valor,blockRow,blockCol,blockArray) + "\n";
@@ -717,6 +378,17 @@ class Interprete {
     }
     return null;
   } 
+
+  generalFoundVariable(blockArray,instruction,blockRow,blockCol){
+    let found = null;
+    for (let i = 0; i < blockArray.length; i++) {
+      if(this.foundVariable(blockArray[i],blockArray[i].variables,instruction,blockRow,blockCol) !== null){
+        found = this.foundVariable(blockArray[i],blockArray[i].variables,instruction,blockRow,blockCol);
+        break;
+      }
+    }
+    return found;
+  }
 
   foundVariable(block,tempVariables,idVariable,varRow,varCol){
     //console.log("id: " + block.nombre);
@@ -745,13 +417,13 @@ class Interprete {
           }
         }
         for (let j = 0; j < block.variables.length; j++) {
-          let newVariable = new VariableRun(block.variables[j].tipo,block.variables[j].id,block.variables[j].valor,'variable');
+          let newVariable = new VariableRun(block.variables[j].tipo,block.variables[j].id,block.variables[j].valor,block.bloques[i].variables[j].tipoVar);
           if(!this.alreadyVariable(newVariable,tempVariables2)){
             tempVariables2.push(newVariable);
           }
         }
         for (let j = 0; j < block.bloques[i].variables.length; j++) {
-          let newVariable = new VariableRun(block.bloques[i].variables[j].tipo,block.bloques[i].variables[j].id,block.bloques[i].variables[j].valor,'variable');
+          let newVariable = new VariableRun(block.bloques[i].variables[j].tipo,block.bloques[i].variables[j].id,block.bloques[i].variables[j].valor,block.bloques[i].variables[j].tipoVar);
           if(!this.alreadyVariable(newVariable,tempVariables2)){
             tempVariables2.push(newVariable);
           }
@@ -783,25 +455,61 @@ class Interprete {
     }
   }
 
-  fillDefaultArray(type,size){
+  fillDefaultArray(type,size1,size2,arrayType){
     let single = [];
-    if(type === 'int'){
-      for(let i = 0; i < size; i++){
-        single[i] = 0;
+    if(arrayType === 'simple'){
+      if(type === 'int'){
+        for(let i = 0; i < size1; i++){
+          single.push(0);
+        }
+      } else if(type === 'double'){
+        for(let i = 0; i < size1; i++){
+        }
+      } else if(type === 'boolean'){
+        for(let i = 0; i < size1; i++){
+          single.push(true);
+        }
+      } else if(type === 'string'){
+        for(let i = 0; i < size1; i++){
+          single.push('');
+        }
       }
-    } else if(type === 'double'){
-      for(let i = 0; i < size; i++){
-        single[i] = 0.0
-      }
-    } else if(type === 'boolean'){
-      for(let i = 0; i < size; i++){
-        single[i] = true;
-      }
-    } else if(type === 'string'){
-      for(let i = 0; i < size; i++){
-        single[i] = '';
+    }else{
+      if(type === 'int'){
+        for(let i = 0; i < size1; i++){
+          let single2 = [];
+          for(let j = 0; j < size2; j++){
+            single2.push(0);
+          }
+          single.push(single2);
+        }
+      } else if(type === 'double'){
+        for(let i = 0; i < size1; i++){
+          let single2 = [];
+          for(let j = 0; j < size2; j++){
+            single2.push(0.0);
+          }
+          single.push(single2);
+        }
+      } else if(type === 'boolean'){
+        for(let i = 0; i < size1; i++){
+          let single2 = [];
+          for(let j = 0; j < size2; j++){
+            single2.push(true);
+          }
+          single.push(single2);
+        }
+      } else if(type === 'string'){
+        for(let i = 0; i < size1; i++){
+          let single2 = [];
+          for(let j = 0; j < size2; j++){
+            single2.push('');
+          }
+          single.push(single2);
+        }
       }
     }
+    //console.log(single);
     return single;
   }
 
@@ -1020,27 +728,59 @@ class Interprete {
 
   returnValue(expression,blockRow,blockCol,blockArray){
     if(expression instanceof Valor){
-      if(expression.tipo === 'int'){return parseInt(expression.valor);}
-      else if(expression.tipo === 'string' || expression.tipo === 'char'){return expression.valor.toString();}
-      else if(expression.tipo === 'boolean'){return (expression.valor === 'true');}
-      else if(expression.tipo === 'double'){return parseFloat(expression.valor);}
+      if(expression.tipo === 'int'){return new Variable('int',parseInt(expression.valor),null);}
+      else if(expression.tipo === 'string' || expression.tipo === 'char'){return new Variable('string',expression.valor.toString(),null);}
+      else if(expression.tipo === 'boolean'){return new Variable('boolean',(expression.valor === 'true'),null);}
+      else if(expression.tipo === 'double'){return new Variable('double',parseFloat(expression.valor),null);}
       return null;
     }else if(expression instanceof Id){
       for (let i = 0; i < blockArray.length; i++) {
         if(this.foundVariable(blockArray[i],blockArray[i].variables,expression.valor,blockRow,blockCol) !== null){
           let founded = this.foundVariable(blockArray[i],blockArray[i].variables,expression.valor,blockRow,blockCol);
-          return founded.valor;     
+          return new Variable(founded.tipo,founded.valor,null);     
         }else{
           continue;
         }
       }
       return null;
+    }else if(expression instanceof Operacion) {
+      return new Variable('int',this.arithmetic(expression),null);
+    }else if(expression instanceof AccesoArraySimple){
+      let found = this.generalFoundVariable(blockArray,expression.id,blockRow,blockCol);
+      if(found === null){return null;}
+      let returned = this.returnValue(expression.expresion,blockRow,blockCol,blockArray);
+      if(returned.tipo_var === 'int'){
+        console.log(found);
+        if(found.tipoVar === 'array'){
+          for (let i = 0; i < found.valor.length; i++) {
+            if(returned.value === i){
+              return new Variable(found.tipo,found.valor[i],null);     
+            }else{continue;}
+          }
+        }else{console.log("Error: Intenta llamar a una variable de diferentes dimensiones a las declaradas");return null;}
+      }else{console.log("Error: Intenta llamar a una lista con una posición de tipo " + returned.tipo_var);return null;}
+    }else if(expression instanceof AccesoArrayDoble){
+      let found = this.generalFoundVariable(blockArray,expression.id,blockRow,blockCol);
+      if(found === null){return null;}
+      let returned1 = this.returnValue(expression.expresion1,blockRow,blockCol,blockArray);
+      let returned2 = this.returnValue(expression.expresion2,blockRow,blockCol,blockArray);
+      if(returned1.tipo_var === 'int' && returned2.tipo_var === 'int'){
+        if(found.tipoVar === 'array_doble'){
+          for (let i = 0; i < found.valor.length; i++) {
+            for (let j = 0; j < found.valor[i].length; j++) {
+              if(returned1.value === i && returned2.value === j){
+                return new Variable(found.tipo,found.valor[i][j],null);     
+              }else{continue;}
+            }
+          }
+        }else{console.log("Error: Intenta llamar a una variable de diferentes dimensiones a las declaradas");return null;}
+      }else{console.log("Error: Intenta llamar a una lista con una posición de tipo diferente a la que intenta declarar");return null;}
     }
     return null;
   }
 
   printText(expression,blockRow,blockCol,blockArray){
-    if (expression instanceof Operacion && expression){
+    if (expression instanceof Operacion){
       let value1 = this.printText(expression.value1,blockRow,blockCol,blockArray);
       let value2 = this.printText(expression.value2,blockRow,blockCol,blockArray);
       return value1 + value2;
@@ -1074,5 +814,295 @@ class Interprete {
 
   getConsoleText(){
     return this.consoleText;
+  }
+
+  variableDeclaration(instruction,blockArray,blockFound,blockRow,blockCol){
+    if (instruction.tipo_dec === "NORMAL") {
+      let found = this.generalFoundVariable(blockArray,instruction.value[0].valor,blockRow,blockCol);
+      if (found === null) {
+        let newVariable = new VariableRun(instruction.tipo_var, instruction.value[0].valor, null, 'variable');
+        this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+      }else{
+        console.log("Error: La variable " + instruction.value[0].valor + " ya ha sido declarada anteriormente");
+      }
+    } else if (instruction.tipo_dec === "SINGLE_ARRAY") {
+      let found = this.generalFoundVariable(blockArray,instruction.value[0].valor,blockRow,blockCol);
+      if (found === null) {
+        let newVariable = new VariableRun(instruction.tipo_var, instruction.value[0].valor, null, 'array');
+        this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+      }else{console.log("Error: La variable " + instruction.value[0].valor + " ya ha sido declarada anteriormente");}
+    } else if (instruction.tipo_dec === "DOUBLE_ARRAY") {
+      let found = this.generalFoundVariable(blockArray,instruction.value[0].valor,blockRow,blockCol);
+      if (found === null) {
+        let newVariable = new VariableRun(instruction.tipo_var, instruction.value[0].valor, null, 'array_doble');
+        this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+      }else{console.log("Error: La variable " + instruction.value[0].valor + " ya ha sido declarada anteriormente");}
+    } else {
+      let found = this.generalFoundVariable(blockArray,instruction.value.tipo_var[0].valor,blockRow,blockCol);
+      if(found === null) {
+        if(instruction.value instanceof OperacionSimplificada) {
+          if(found !== null){
+            if(found.valor !== null){
+              if(found.tipo === "int" || found.tipo === "double") {
+                if(instruction.value.tipo === "++") {found.valor = found.valor + 1;}
+                else{found.valor = found.valor - 1;}
+              } else{console.log("Error en aumentar cantidad en una variable no numérica");}
+            } else{console.log("Error: La variable a la que le quiere cambiar su valor es nula, debe inicializarla");}
+          } else{console.log("Error: La variable a la que le quiere cambiar su valor no existe");}
+        } else{
+          //Asignacion
+          if (instruction.value.tipo_asg === "NORMAL") {
+            this.asignationValue(instruction,blockArray,blockFound,1,blockRow,blockCol);
+          } else if (instruction.value.tipo_asg === "SINGLE_ARRAY") {
+            this.asignationValue(instruction,blockArray,blockFound,2,blockRow,blockCol);
+          } else if (instruction.value.tipo_asg === "DOUBLE_ARRAY") {
+            this.asignationValue(instruction,blockArray,blockFound,3,blockRow,blockCol);
+          }
+        }
+      }else{console.log("Error: La variable " + instruction.value.tipo_var[0].valor + " ya ha sido declarada anteriormente");}
+    }
+  }
+
+  asignationValue(instruction,blockArray,blockFound,typeVar,blockRow,blockCol){
+    if (instruction.value.value instanceof Operacion) {
+      if(typeVar === 1){
+        if(instruction.tipo_var === 'int' || instruction.tipo_var === 'double'){
+          let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.arithmetic(instruction.value.value),'variable');
+          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+        }else if(instruction.tipo_var === 'string'){
+          let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.printText(instruction.value.value),'variable');
+          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+        } else{
+          console.log("Error: Está intentando asignar contenidos de tipo incorrectos en variables");
+        }
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un solo valor a un vector");
+      } else{
+        console.log("Error: No puede asignar un solo valor a un vector");
+      }
+    } else if(instruction.value.value instanceof Negativo) {
+      if(typeVar === 1){
+        if(instruction.tipo_var === 'int' || instruction.tipo_var === 'double'){
+          let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.arithmetic(instruction.value.value),'variable');
+          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+        } else{
+          console.log("Error: Solo puede asignar valores numéricos a variables numéricas");
+        }
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un solo valor a un vector");
+      } else{
+        console.log("Error: No puede asignar un solo valor a un vector");
+      }
+    } else if(instruction.value.value instanceof Valor){
+      if(typeVar === 1){
+        if(instruction.value.value.tipo === instruction.tipo_var){
+          let valueToAssign = null;
+          if(instruction.tipo_var === 'int'){valueToAssign = parseInt(instruction.value.value.valor);}
+          else if(instruction.tipo_var === 'string' || instruction.tipo_var === 'char'){valueToAssign = instruction.value.value.valor.toString();}
+          else if(instruction.tipo_var === 'boolean'){valueToAssign = (instruction.value.value.valor === 'true');}
+          else if(instruction.tipo_var === 'double'){valueToAssign = parseFloat(instruction.value.value.valor);}
+          let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, valueToAssign, 'variable');
+          //console.log(blockFound);
+          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+        } else{
+          console.log("El valor asignado no corresponde con el tipo de variable");
+        }
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un solo valor a un vector");
+      } else{
+        console.log("Error: No puede asignar un solo valor a un vector");
+      }
+    } else if(instruction.value.value instanceof OperacionSimplificada){
+      if(typeVar === 1){
+        let found2 = this.generalFoundVariable(blockArray,instruction.value.value.valor,blockRow,blockCol);
+        if(found2 !== null){
+          if (instruction.tipo_var === "int" || instruction.tipo_var === "double") {
+            if (found2.tipo === "int" || instruction.tipo === "double") {
+              if (instruction.value.value.tipo === "++") {
+                instruction.value.value = found2.valor + 1;
+              } else {
+                instruction.value.value = found2.valor - 1;
+              }
+              let newVariable = new VariableRun(instruction.tipo_var, instruction.value.value.tipo_var[0].valor, instruction.value.value,'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+            } else {console.log("Error: La variable que llamó para aumentar el valor no es numérica");}
+          } else {console.log("Error: La variable en la que desea aumentar el valor no es numérica");}
+        }else{console.log("Error: El id " + instruction.value.value.valor + " no existe");}
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un solo valor a un vector");
+      } else{
+        console.log("Error: No puede asignar un solo valor a un vector");
+      }
+    } else if(instruction.value.value instanceof Casteo){
+      if(typeVar === 1){
+        let found2 = this.generalFoundVariable(blockArray,instruction.value.value.valor.valor,blockRow,blockCol);
+        if(found2 !== null){
+          if (instruction.tipo_var === instruction.value.value.tipo) {
+            //int a string
+            if(instruction.value.value.tipo === 'string' && found2.tipo === 'int'){
+              let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, found2.valor.toString(),'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+              console.log("Variable casteada de int a string");
+            //int a double
+            } else if(instruction.value.value.tipo === 'double' && found2.tipo === 'int'){
+              let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor,(found2.valor).toFixed(1),'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+              console.log("Variable casteada de int a double");
+            //double a int
+            } else if(instruction.value.value.tipo === 'int' && found2.tipo === 'double'){
+              let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor,parseInt(found2.valor, 10),'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+              console.log("Variable casteada de double a int");
+            //double a string
+          } else if(instruction.value.value.tipo === 'string' && found2.tipo === 'double'){
+            let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor,found2.valor.toString(),'variable');
+            this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+            console.log("Variable casteada de double a string");
+          }
+          } else{console.log("Error: Quiere asignar un casteo de una variable tipo " + instruction.value.value.tipo + " en una tipo " + instruction.tipo_var);}
+        } else{console.log("Error: El id " + instruction.value.value.valor + " no existe");}
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un solo valor a un vector");
+      } else{
+        console.log("Error: No puede asignar un solo valor a un vector");
+      }
+    } else if(instruction.value.value instanceof nuevoArraySimple){
+      if(typeVar === 1){
+      console.log("Error: No puede asignar un vector simple a una variable normal");
+      } else if(typeVar === 2){
+        if(instruction.tipo_var === instruction.value.value.tipo){
+          let returned = this.returnValue(instruction.value.value.expresion,blockRow,blockCol,blockArray);
+          let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor,this.fillDefaultArray(instruction.tipo_var,returned.value,null,'simple'),'array');
+          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+        } else{
+          console.log("Error: Está asignando un vector " + instruction.value.value.tipo + " a uno " + instruction.tipo_var);
+        }
+      } else{
+        console.log("Error: No puede asignar un vector simple a un vector doble");
+      }
+    } else if(instruction.value.value instanceof nuevoArrayDoble){
+      if(typeVar === 1){
+        console.log("Error: No puede asignar un vector doble a una variable normal");
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un vector doble a un vector simple");
+      } else{
+        if(instruction.tipo_var === instruction.value.value.tipo){
+          let returned1 = this.returnValue(instruction.value.value.expresion1,blockRow,blockCol,blockArray);
+          let returned2 = this.returnValue(instruction.value.value.expresion2,blockRow,blockCol,blockArray);
+          let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, this.fillDefaultArray(instruction.tipo_var,returned1.value,returned2.value,'doble'),'array_doble');
+          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+        } else{
+          console.log("Error: Está asignando un vector " + instruction.value.value.tipo + " a uno " + instruction.tipo_var);
+        }
+      }
+    } else if(instruction.value.value instanceof NuevoArray){
+      if(typeVar === 1){
+        console.log("Error: No puede asignar una lista a una variable normal");
+      } else if(typeVar === 2){
+        let valores = [];
+        for (let i = 0; i < instruction.value.value.lista.length; i++) {
+          let returned = this.returnValue(instruction.value.value.lista[i],blockRow,blockCol,blockArray);
+          if(instruction.tipo_var === returned.tipo_var){
+            valores.push(returned.value);
+          } else{
+            console.log("Error: Está asignando un valor tipo " + returned.tipo_var + " a una lista tipo " + instruction.tipo_var);
+          }
+        }
+        let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor,valores,'array');
+        this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+      } else{
+        console.log("Error: No puede asignar una lista a un vector doble");
+      }
+    } else if(instruction.value.value instanceof AccesoArraySimple){
+      if(typeVar === 1){
+        let founded = this.generalFoundVariable(blockArray,instruction.value.value.id,blockRow,blockCol);
+        let found = this.returnValue(instruction.value.value,blockRow,blockCol,blockArray);
+        if(founded !== null){
+          if(found.tipo_var === instruction.tipo_var){
+            let newVariable = new VariableRun(instruction.tipo_var,instruction.value.tipo_var[0].valor,found.value,'variable');
+            this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+          }else{
+            console.log("Error: Quiere asignar una variable tipo " + found.tipo_var + " en una tipo " + instruction.tipo_var);
+          }
+        }else{console.log("Error: El id " + instruction.value.value.id + " no existe");}
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un solo valor a un vector");
+      } else{
+        console.log("Error: No puede asignar un solo valor a un vector doble");
+      }
+    } else if(instruction.value.value instanceof AccesoArrayDoble){
+      if(typeVar === 1){
+        let founded = this.generalFoundVariable(blockArray,instruction.value.value.id,blockRow,blockCol);
+        let found = this.returnValue(instruction.value.value,blockRow,blockCol,blockArray);
+        if(founded !== null){
+          if(found !== null){
+            if(found.tipo_var === instruction.tipo_var){
+              let newVariable = new VariableRun(instruction.tipo_var,instruction.value.tipo_var[0].valor,found.value,'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+            }else{
+              console.log("Error: Quiere asignar una variable tipo " + found.tipo_var + " en una tipo " + instruction.tipo_var);
+            }
+          }else{console.log("Error: No se ha encontrado el valor para " + instruction.value.value.id);}
+        }else{console.log("Error: El id " + instruction.value.value.id + " no existe");}
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un solo valor a un vector");
+      } else{
+        console.log("Error: No puede asignar un solo valor a un vector doble");
+      }
+    } else if(instruction.value.value instanceof Operador){
+      if(typeVar === 1){
+        console.log("Error: No puede asignar un operador a una variable");
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un operador a un vector");
+      } else{
+        console.log("Error: No puede asignar un operador a un vector");
+      }
+    } else if(instruction.value.value instanceof Negacion){
+      if(typeVar === 1){
+        console.log("Error: No puede asignar un operador a una variable");
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar un operador a una vector");
+      } else{
+        console.log("Error: No puede asignar un operador a una vector");
+      }
+    } else if(instruction.value.value instanceof Relacional){
+      if(typeVar === 1){
+        console.log("Error: No puede asignar una relación a una variable");
+      } else if(typeVar === 2){
+        console.log("Error: No puede asignar una relación a una vector");
+      } else{
+        console.log("Error: No puede asignar una relación a una vector");
+      }
+    } else if(instruction.value.value instanceof Id){
+      let found2 = this.generalFoundVariable(blockArray,instruction.value.value.valor,blockRow,blockCol);
+      if(typeVar === 1){
+        if(found2 !== null){
+          if(found2.tipo === instruction.tipo_var){
+            if(found2.tipoVar === 'variable'){
+              let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, found2.valor,'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+            }else{console.log("Error: Quiere asignar una variable de diferentes dimensiones en una simple");}
+          }else{console.log("Error: Quiere asignar una variable tipo " + found2.tipo + " en una tipo " + instruction.tipo_var);}
+        }else{console.log("Error: El id " + instruction.value.value.valor + " no existe");}
+      } else if(typeVar === 2){
+        if(found2 !== null){
+          if(found2.tipo === instruction.tipo_var){
+            if(found2.tipoVar === 'array'){
+              let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, found2.valor,'array');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+            }else{console.log("Error: Quiere asignar una variable de diferentes dimensiones en un vector");}
+          }else{console.log("Error: Quiere asignar una variable tipo " + found2.tipo + " en una tipo " + instruction.tipo_var);}
+        }else{console.log("Error: El id " + instruction.value.value.valor + " no existe");}
+      } else{
+        if(found2 !== null){
+          if(found2.tipo === instruction.tipo_var){
+            if(found2.tipoVar === 'array_doble'){
+              let newVariable = new VariableRun(instruction.tipo_var, instruction.value.tipo_var[0].valor, found2.valor,'array_doble');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+           }else{console.log("Error: Quiere asignar una variable de diferentes dimensiones en un vector doble");}
+          }else{console.log("Error: Quiere asignar una variable tipo " + found2.tipo + " en una tipo " + instruction.tipo_var);}
+        }else{console.log("Error: El id " + instruction.value.value.valor + " no existe");}
+      }
+    }
   }
 }
