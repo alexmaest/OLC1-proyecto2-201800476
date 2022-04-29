@@ -117,7 +117,7 @@ INSTRUCCIONES_G : INSTRUCCIONES_G INSTRUCCION_G {$1.push($2);$$ = $1;}
 | INSTRUCCION_G {$$ = [$1];}
 | error
 ;
-INSTRUCCION_G : VARIABLE {$$=$1;}
+INSTRUCCION_G : TIPO_VAR VARIABLE ';' {$$ = new Variables($1,$2);}
 | FUNCION {$$=$1;}
 | RUN {$$=$1;}
 | IMPRIMIR {$$=$1;}
@@ -136,17 +136,17 @@ FUNCION : Tx_Id '(' PARAMETROS ')' ':' TIPO_VAR BLOQUE {$$=new Funcion($1,$3,$6,
 | Tx_Id '(' PARAMETROS ')' BLOQUE {$$=new Funcion($1,$3,null,$5,3,@1.first_line,@1.first_column);}
 | Tx_Id '(' ')' BLOQUE {$$=new Funcion($1,[],null,$4,4,@1.first_line,@1.first_column);}
 ;
-PARAMETROS : PARAMETROS ',' TIPO_VAR Tx_Id {$1.push(new Parametro($3,$4,'VARIABLE'));$$ = $1;}
-| PARAMETROS ',' TIPO_VAR '[' ']' Tx_Id {$1.push(new Parametro($3,$6,'ARRAY'));$$ = $1;}
-| PARAMETROS ',' TIPO_VAR '[' ']' '[' ']' Tx_Id {$1.push(new Parametro($3,$8,'ARRAYDOUBLE'));$$ = $1;}
-| TIPO_VAR '[' ']' Tx_Id {$$ = [new Parametro($1,$4,'ARRAY')];}
-| TIPO_VAR '[' ']' '[' ']' Tx_Id {$$ = [new Parametro($1,$6,'ARRAYDOUBLE')];}
-| TIPO_VAR Tx_Id {$$ = [new Parametro($1,$2,'VARIABLE')];}
+PARAMETROS : PARAMETROS ',' TIPO_VAR Tx_Id {$1.push(new Parametro($3,$4,'variable'));$$ = $1;}
+| PARAMETROS ',' TIPO_VAR '[' ']' Tx_Id {$1.push(new Parametro($3,$6,'array'));$$ = $1;}
+| PARAMETROS ',' TIPO_VAR '[' ']' '[' ']' Tx_Id {$1.push(new Parametro($3,$8,'array_doble'));$$ = $1;}
+| TIPO_VAR '[' ']' Tx_Id {$$ = [new Parametro($1,$4,'array')];}
+| TIPO_VAR '[' ']' '[' ']' Tx_Id {$$ = [new Parametro($1,$6,'array_doble')];}
+| TIPO_VAR Tx_Id {$$ = [new Parametro($1,$2,'variable')];}
 ;
 INSTRUCCIONES_L : INSTRUCCIONES_L INSTRUCCION_L {$1.push($2);$$ = $1;}
 | INSTRUCCION_L {$$ = [$1];}
 ;
-INSTRUCCION_L : VARIABLE {$$=$1;}
+INSTRUCCION_L : TIPO_VAR VARIABLE ';' {$$ = new Variables($1,$2);}
 | ASIGNACION ';' {$$=$1;}
 | LLAMADA_F ';' {$$=$1;}
 | SENTENCIAS {$$=$1;}
@@ -192,8 +192,8 @@ DEFAULT : 'default' ':' INSTRUCCIONES_L {
 ;
 WHILE : 'while' '(' EXP ')' BLOQUE {$$ = new While($3,$5,@1.first_line,@1.first_column);}
 ;
-FOR : 'for' '(' VARIABLE EXP ';' ASIGNACION ')' BLOQUE {$$ = new For($3,$4,$6,$8,@1.first_line,@1.first_column);}
-| 'for' '(' ASIGNACION ';' EXP ';' ASIGNACION ')' BLOQUE {$$ = new For($3,$5,$7,$9,@1.first_line,@1.first_column);}
+FOR : 'for' '(' TIPO_VAR VARIABLE ';' EXPREL ';' ASIGNACION ')' BLOQUE {$$ = new For($3,$4,$6,$8,@1.first_line,@1.first_column);}
+| 'for' '(' ASIGNACION ';' EXPREL ';' ASIGNACION ')' BLOQUE {$$ = new For($3,$5,$7,$9,@1.first_line,@1.first_column);}
 ;
 DOWHILE : 'do' BLOQUE 'while' '(' EXP ')' ';' {$$ = new DoWhile($2,$5,@1.first_line,@1.first_column);}
 ;
@@ -214,20 +214,24 @@ LLAMADA_F : Tx_Id '(' ')' {$$=new Llamada($1,'NORMAL',[]);}
 | 'tostring' '(' EXP ')' {$$=new Llamada($1,'TOSTRING',$3);}
 | 'tochararray' '(' EXP ')' {$$=new Llamada($1,'TOCHARARRAY',$3);}
 ;
-VARIABLE : TIPO_VAR ASIGNACION ';' {$$ = new Variable($1,$2,'ASIGNACION');}
-| TIPO_VAR ID_LIST ';' {$$ = new Variable($1,$2,'NORMAL');}
-| TIPO_VAR ID_LIST '[' ']' ';' {$$ = new Variable($1,$2,'SINGLE_ARRAY');}
-| TIPO_VAR ID_LIST '[' ']' '[' ']' ';' {$$ = new Variable($1,$2,'DOUBLE_ARRAY');}
+VARIABLE : VARIABLE ',' ASIGNACION {$1.push(new Variable($3,'ASIGNACION'));$$ = $1;}
+| VARIABLE ',' Tx_Id {$1.push(new Variable($3,'NORMAL'));$$ = $1;}
+| VARIABLE ',' Tx_Id '[' ']' {$1.push(new Variable($3,'SINGLE_ARRAY'));$$ = $1;}
+| VARIABLE ',' Tx_Id '[' ']' '[' ']' {$1.push(new Variable($3,'DOUBLE_ARRAY'));$$ = $1;}
+| ASIGNACION {$$ = [new Variable($1,'ASIGNACION')];}
+| Tx_Id {$$ = [new Variable($1,'NORMAL')];}
+| Tx_Id '[' ']' {$$ = [new Variable($1,'SINGLE_ARRAY')];}
+| Tx_Id '[' ']' '[' ']' {$$ = [new Variable($1,'DOUBLE_ARRAY')];}
 ;
-ASIGNACION: ID_LIST '=' EXP {$$ = new Asignacion($1,$3,'NORMAL');}
-| ID_LIST '[' ']' '=' EXP {$$ = new Asignacion($1,$5,'SINGLE_ARRAY');}
-| ID_LIST '[' ']' '[' ']' '=' EXP {$$ = new Asignacion($1,$7,'DOUBLE_ARRAY');}
-//| ID_LIST '[' EXP ']' '=' EXP 
+//ID_LIST : ID_LIST ',' Tx_Id {$1.push($$=new Id($1));$$ = $1;}
+//| Tx_Id {$$=[$$=new Id($1)];}
+//;
+ASIGNACION: Tx_Id '=' EXP {$$ = new Asignacion($1,$3,'NORMAL');}
+| Tx_Id '[' ']' '=' EXP {$$ = new Asignacion($1,$5,'SINGLE_ARRAY');}
+| Tx_Id '[' ']' '[' ']' '=' EXP {$$ = new Asignacion($1,$7,'DOUBLE_ARRAY');}
+| Tx_Id '[' EXP ']' '=' EXP
 | Tx_Id '++' {$$=new OperacionSimplificada($1,'++');}
 | Tx_Id '--' {$$=new OperacionSimplificada($1,'--');}
-;
-ID_LIST : ID_LIST ',' Tx_Id {$1.push($$=new Id($1));$$ = $1;}
-| Tx_Id {$$=[$$=new Id($1)];}
 ;
 TIPO_VAR : 'int' {$$=$1;}
 | 'double' {$$=$1;}
