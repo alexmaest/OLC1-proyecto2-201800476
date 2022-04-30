@@ -1,5 +1,3 @@
-//Definir el codigo
-// Todo codigo javascript, que necesitemos incluir
 %{
 %}
 
@@ -8,8 +6,10 @@
 
 %%
 
-\s+             // se ignoran los espacios en blanco
-\/\/[^\n]*          // comentarios de simple linea
+\s+                                           // omite espacios
+\/\/[^\n]*                                   // comentario simple línea
+[/][*][^*]*[*]+([^/*][^*]*[*]+)*[/]			// comentario multiple líneas  
+     
 
 //Palabras reservadas
 
@@ -60,7 +60,7 @@
 "||"                return '||'
 "&&"                return '&&'
 "!"                 return '!'
-//"?"                 return '?'
+"?"                 return '?'
 "++"                return '++'
 "--"                return '--'
 "+"                 return '+'
@@ -75,14 +75,14 @@
 ","                 return ','
 "="                 return '='
 
-//EXPes regulares
+//Expresiones regulares
 
 (true|false)                                return 'Tx_Boolean';
+(\'[^'\\]\')                                return 'Tx_Char';
 \"[^\"]*\"                                  return 'Tx_String';
+[0-9]+\.[0-9]+                              return 'Tx_Double';
 [0-9]+                                      return 'Tx_Integer';
 [A-Za-zÑñ]+[0-9_]*                          return 'Tx_Id';
-[0-9]+\.[0-9]+                              return 'Tx_Double';
-(\'[^'\\]\')                                return 'Tx_Char';
 //(\'[^'\\]\')|(\'(\\\\|\\n|\\t|\\r|\\")\')   return 'Tx_Char';
 
 <<EOF>>				return 'EOF';
@@ -95,7 +95,7 @@
 /lex
 
 %right          '++','--'
-%left           ':'
+%left           '?',':'
 %left           '||'
 %left           '&&'
 %right          '!' 
@@ -192,7 +192,7 @@ DEFAULT : 'default' ':' INSTRUCCIONES_L {
 ;
 WHILE : 'while' '(' EXP ')' BLOQUE {$$ = new While($3,$5,@1.first_line,@1.first_column);}
 ;
-FOR : 'for' '(' TIPO_VAR VARIABLE ';' EXPREL ';' ASIGNACION ')' BLOQUE {$$ = new For($3,$4,$6,$8,@1.first_line,@1.first_column);}
+FOR : 'for' '(' TIPO_VAR VARIABLE ';' EXPREL ';' ASIGNACION ')' BLOQUE {$$ = new For(new Variables($3,$4),$6,$8,$10,@1.first_line,@1.first_column);}
 | 'for' '(' ASIGNACION ';' EXPREL ';' ASIGNACION ')' BLOQUE {$$ = new For($3,$5,$7,$9,@1.first_line,@1.first_column);}
 ;
 DOWHILE : 'do' BLOQUE 'while' '(' EXP ')' ';' {$$ = new DoWhile($2,$5,@1.first_line,@1.first_column);}
@@ -223,13 +223,11 @@ VARIABLE : VARIABLE ',' ASIGNACION {$1.push(new Variable($3,'ASIGNACION'));$$ = 
 | Tx_Id '[' ']' {$$ = [new Variable($1,'SINGLE_ARRAY')];}
 | Tx_Id '[' ']' '[' ']' {$$ = [new Variable($1,'DOUBLE_ARRAY')];}
 ;
-//ID_LIST : ID_LIST ',' Tx_Id {$1.push($$=new Id($1));$$ = $1;}
-//| Tx_Id {$$=[$$=new Id($1)];}
-//;
 ASIGNACION: Tx_Id '=' EXP {$$ = new Asignacion($1,$3,'NORMAL');}
 | Tx_Id '[' ']' '=' EXP {$$ = new Asignacion($1,$5,'SINGLE_ARRAY');}
 | Tx_Id '[' ']' '[' ']' '=' EXP {$$ = new Asignacion($1,$7,'DOUBLE_ARRAY');}
-| Tx_Id '[' EXP ']' '=' EXP
+| Tx_Id '[' EXP ']' '=' EXP {$$ = new Asignacion($1,new ModificacionArray($3,$6),'NORMAL');}
+| Tx_Id '[' EXP ']' '[' EXP ']' '=' EXP {$$ = new Asignacion($1,new ModificacionArrayDoble($3,$6,$9),'NORMAL');}
 | Tx_Id '++' {$$=new OperacionSimplificada($1,'++');}
 | Tx_Id '--' {$$=new OperacionSimplificada($1,'--');}
 ;
@@ -243,7 +241,7 @@ TIPO_VAR : 'int' {$$=$1;}
 EXP : EXPMATH {$$=$1;}
 | EXPOP {$$=$1;}
 | EXPREL {$$=$1;}
-//| EXPTER {$$=$1;}
+| EXPTER {$$=$1;}
 | LLAMADA_F {$$=$1;}
 | '(' TIPO_VAR ')' EXP {$$=new Casteo($2,$4);}
 | '(' EXP ')' {$$=$2;}
@@ -278,8 +276,8 @@ EXPREL : EXP '==' EXP {$$ = new Relacional($1,$3,'IGUAL_IGUAL');}
 | EXP '>' EXP {$$ = new Relacional($1,$3,'MAYOR');}
 | EXP '>=' EXP {$$ = new Relacional($1,$3,'MAYOR_IGUAL');}
 ;
-//EXPTER : EXP '?' EXP ':' EXP
-//;
+EXPTER : EXP '?' EXP ':' EXP {$$ = new Ternario($1,$3,$5);}
+;
 VALORES_LIST : VALORES_LIST ',' VALORES {$1.push($3);$$ = $1;}
 | VALORES {$$ = [$1];}
 ;

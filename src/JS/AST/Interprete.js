@@ -52,37 +52,60 @@ class Interprete {
     if (instruction instanceof Variables) {
       this.variableDeclaration(instruction,blockArray,blockFound,blockRow,blockCol);
     } else if (instruction instanceof Asignacion) {
-      let found = this.generalFoundVariable(blockArray,type[0].valor,blockRow,blockCol);
+      //console.log(instruction);
+      let found = this.generalFoundVariable(blockArray,instruction.tipo_var,blockRow,blockCol);
       let valueFounded = this.returnValue(instruction.value,blockRow,blockCol,blockArray);
+      //console.log(valueFounded);
       if (found !== null) {
         if(instruction.tipo_asg === 'NORMAL' && found.tipoVar === 'variable'){
-          if(valueFounded.tipo_var === found.tipo){
-            let valueToAssign = valueFounded.value;
-            if(found.tipo === 'int'){valueToAssign = parseInt(valueFounded.value);}
-            else if(found.tipo === 'string' || found.tipo === 'char'){valueToAssign = valueFounded.value.toString();}
-            else if(found.tipo === 'boolean'){valueToAssign = (valueFounded.value === 'true');}
-            else if(found.tipo === 'double'){valueToAssign = parseFloat(valueFounded.value);}
-            found.valor = valueToAssign;
+          if(valueFounded.value === found.tipo){
+            found.valor = valueFounded.tipo_dec;
           } else{
             console.log("El valor asignado no corresponde con el tipo de variable");
           }
         } else if(instruction.tipo_asg === 'SINGLE_ARRAY' && found.tipoVar === 'array'){
-          if(valueFounded.tipo_var === found.tipo){
+          if(valueFounded.value === found.tipo){
+            let valueToAssign = valueFounded.tipo_dec;
             found.valor = valueToAssign;
           } else{
             console.log("El valor asignado no corresponde con el tipo de variable");
           }
         } else if(instruction.tipo_asg === 'DOUBLE_ARRAY' && found.tipoVar === 'array_doble'){
-          if(valueFounded.tipo_var === found.tipo){
+          if(valueFounded.value === found.tipo){
+            let valueToAssign = valueFounded.tipo_dec;
+            found.valor = valueToAssign;
+          } else if(instruction.value.lista[0] instanceof NuevoArray){
+            let valueToAssign = valueFounded.tipo_dec;
             found.valor = valueToAssign;
           } else{
             console.log("El valor asignado no corresponde con el tipo de variable");
+          }
+        } else if(instruction.value instanceof ModificacionArray){
+          let returnedExp =  this.returnValue(instruction.value.exp,blockRow,blockCol,blockArray);
+          let returnedAssign =  this.returnValue(instruction.value.valor,blockRow,blockCol,blockArray);
+          for (let i = 0; i < found.valor.length; i++) {
+            if(i === returnedExp.tipo_dec){
+              found.valor[i] = returnedAssign.tipo_dec;
+              break;
+            }
+          }
+        } else if(instruction.value instanceof ModificacionArrayDoble){
+          let returnedExp1 =  this.returnValue(instruction.value.exp1,blockRow,blockCol,blockArray);
+          let returnedExp2 =  this.returnValue(instruction.value.exp2,blockRow,blockCol,blockArray);
+          let returnedAssign =  this.returnValue(instruction.value.valor,blockRow,blockCol,blockArray);
+          for (let i = 0; i < found.valor.length; i++) {
+            for (let j = 0; j < found.valor[i].length; j++) {
+              if(i === returnedExp1.tipo_dec && j === returnedExp2.tipo_dec){
+                found.valor[i][j] = returnedAssign.tipo_dec;
+                break;
+              }
+            }
           }
         } else{
           console.log("Error: Quiere asignar un valor de una variable de diferentes dimensiones");
           //Falta otros tipos de asignacion
         }
-      }else{console.log("Error: La variable " + type[0].valor + " aún no se ha declarado");}
+      }else{console.log("Error: La variable " + type.tipo_var + " aún no se ha declarado");}
     } else if (instruction instanceof OperacionSimplificada) {
       this.returnValue(instruction,blockRow,blockCol,blockArray);
     } else if (instruction instanceof Llamada) {
@@ -176,7 +199,7 @@ class Interprete {
       }
       //found.valor = counter;
     } else if (instruction instanceof While) {
-      console.log(instruction);
+      //console.log(instruction);
       let newBlock = new BloqueRun('while',instruction.fila,instruction.columna,[],[],[]);
       this.addBlock(blockArray,blockFound.fila,blockFound.columna,newBlock);
 
@@ -237,7 +260,7 @@ class Interprete {
         }
       }
     } else if (instruction instanceof Switch) {
-      console.log(instruction);
+      //console.log(instruction);
       let newBlock = new BloqueRun('switch',instruction.fila,instruction.columna,[],[],[]);
       this.addBlock(blockArray,blockFound.fila,blockFound.columna,newBlock);
 
@@ -247,8 +270,7 @@ class Interprete {
         let returned = this.returnValue(instruction.bloque[i].expresion,instruction.fila,instruction.columna,blockArray);
         if(instruction.bloque[i].tipo === 'CASE'){
           if(returned !== null){
-            console.log(principal.value === returned.value);
-            if(principal.value === returned.value){
+            if(principal.tipo_dec === returned.tipo_dec){
               for (let j = 0; j < instruction.bloque[i].bloque.Instrucciones.length; j++) {
                 let newBlock2 = new BloqueRun('case',instruction.bloque[i].bloque.fila,instruction.bloque[i].bloque.columna,[],[],[]);
                 this.addBlock(blockArray,instruction.fila,instruction.columna,newBlock2);
@@ -516,90 +538,366 @@ class Interprete {
     }
   }
   
-  arithmetic(expression,blockRow,blockCol,blockArray) {
-    if (expression instanceof Operacion) {
-      
-      if (expression.signo === "+") {
-        if(expression.value1 instanceof Operacion || expression.value1 instanceof Negativo){
-          if(expression.value2 instanceof Valor){
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) + parseInt(expression.value2.valor);
-          }else if(expression.value2 instanceof Id){
-            let returned = this.returnValue(expression.value2,blockRow,blockCol,blockArray);
-            if(returned.tipo_var === 'int' || returned.tipo_var === 'double'){
-              return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) + returned.value;
-            }else{console.log("Error: El valor a operar no es numérico");return null;}
-          }else{
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) + this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
-          }
+  arithmeticReturn(valor1,valor2,signo){
+    //console.log(valor1);
+    //console.log(valor2);
+    if (signo === "+") {
+      if(valor1.value === 'int'){
+        if(valor2.value === 'int'){
+        return new Variable('int',parseInt(valor1.tipo_dec) + parseInt(valor2.tipo_dec));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) + valor2.tipo_dec);
+        } else if(valor2.value === 'boolean'){
+          return new Variable('int',parseInt(valor1.tipo_dec));
+        } else if(valor2.value === 'char'){
+          return new Variable('int',parseInt(valor1.tipo_dec) + valor2.tipo_dec.charCodeAt(1));
+        } else{
+          //cadena
+          return new Variable('string',valor1.tipo_dec.toString() + valor2.tipo_dec.toString());
         }
-        if(expression.value2 instanceof Operacion || expression.value2 instanceof Negativo){
-          if(expression.value1 instanceof Valor){
-            return parseInt(expression.value1.valor) + this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
-          }else if(expression.value1 instanceof Id){
-            let returned = this.returnValue(expression.value1,blockRow,blockCol,blockArray);
-            if(returned.tipo_var === 'int' || returned.tipo_var === 'double'){
-              return returned.value + this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
-            }else{console.log("Error: El valor a operar no es numérico");return null;}
-          }else{
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) + this.arithmetic(expression.value2,blockRow,blockCol,blockArray,blockRow,blockCol,blockArray);
-          }
+      } else if(valor1.value === 'double'){
+        if(valor2.value === 'int'){
+        return new Variable('double',valor1.tipo_dec + valor2.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) + valor2.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'boolean'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'char'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) + valor2.tipo_dec.charCodeAt(1).toFixed(1));
+        } else{
+          //cadena
+          return new Variable('string',valor1.tipo_dec.toString() + valor2.tipo_dec.toString());
         }
-        if(expression.value1 instanceof Valor && expression.value2 instanceof Valor){
-            return parseInt(expression.value1.valor) + parseInt(expression.value2.valor);
+      } else if(valor1.value === 'boolean'){
+        if(valor2.value === 'int'){
+        return new Variable('int',parseInt(valor2.tipo_dec));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor2.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'boolean'){
+          console.log("Error: No puede concatenar valores booleanos");
+          return new Variable(null,null);
+        } else if(valor2.value === 'char'){
+          console.log("Error: No puede concatenar valores booleanos con caracteres");
+          return new Variable(null,null);
+        } else{
+          //cadena
+          return new Variable('string',valor1.tipo_dec.toString() + valor2.tipo_dec.toString());
         }
-        if(expression.value1 instanceof Id && expression.value2 instanceof Id){
-          let returned1 = this.returnValue(expression.value1,blockRow,blockCol,blockArray);
-          let returned2 = this.returnValue(expression.value2,blockRow,blockCol,blockArray);
-          if(returned1.tipo_var === 'int' || returned1.tipo_var === 'double' && returned2.tipo_var === 'int' || returned2.tipo_var === 'double'){
-            return parseInt(returned1.value) + parseInt(returned2.value);
-          }else{console.log("Error: El valor a operar no es numérico");return null;}
+      } else if(valor1.value === 'char'){
+        if(valor2.value === 'int'){
+          return new Variable('int',parseInt(valor1.tipo_dec.charCodeAt(1)) + parseInt(valor2.tipo_dec));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.charCodeAt(1).toFixed(1) + valor2.tipo_dec);
+        } else if(valor2.value === 'boolean'){
+          console.log("Error: No puede concatenar valores booleanos con caracteres");
+          return new Variable(null,null);
+        } else if(valor2.value === 'char'){
+          return new Variable('string',valor1.tipo_dec.toString() + valor2.tipo_dec.toString());
+        } else{
+          //cadena
+          return new Variable('string',valor1.tipo_dec.toString() + valor2.tipo_dec.toString());
+        }
+      } else{
+        //cadena
+        return new Variable('string',valor1.tipo_dec.toString() + valor2.tipo_dec.toString());
       }
-      } else if (expression.signo === "-") {
-        if(expression.value1 instanceof Operacion || expression.value1 instanceof Negativo){
-          if(expression.value2 instanceof Valor){
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) - parseInt(expression.value2.valor);
-          }else{
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) - this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
+    }else if (signo === "-") {
+      if(valor1.value === 'int'){
+        if(valor2.value === 'int'){
+        return new Variable('int',parseInt(valor1.tipo_dec) - parseInt(valor2.tipo_dec));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) - valor2.tipo_dec);
+        } else if(valor2.value === 'boolean'){
+          return new Variable('int',parseInt(valor1.tipo_dec));
+        } else if(valor2.value === 'char'){
+          return new Variable('int',parseInt(valor1.tipo_dec) - valor2.tipo_dec.charCodeAt(1));
+        } else{
+          //cadena
+          console.log("Error: No puede restar valores enteros con caracteres");
+          return new Variable(null,null);
+        }
+      } else if(valor1.value === 'double'){
+        if(valor2.value === 'int'){
+        return new Variable('double',valor1.tipo_dec - valor2.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) - valor2.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'boolean'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'char'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) - valor2.tipo_dec.charCodeAt(1).toFixed(1));
+        } else{
+          //cadena
+          console.log("Error: No puede restar valores double con cadenas");
+          return new Variable(null,null);
+        }
+      } else if(valor1.value === 'boolean'){
+        if(valor2.value === 'int'){
+        return new Variable('int',parseInt(valor2.tipo_dec));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor2.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'boolean'){
+          console.log("Error: No puede restar valores booleanos");
+          return new Variable(null,null);
+        } else if(valor2.value === 'char'){
+          console.log("Error: No puede restar valores booleanos con caracteres");
+          return new Variable(null,null);
+        } else{
+          //cadena
+          console.log("Error: No puede concatenar valores booleanos con cadenas");
+          return new Variable(null,null);
+        }
+      } else if(valor1.value === 'char'){
+        if(valor2.value === 'int'){
+          return new Variable('int',parseInt(valor1.tipo_dec.charCodeAt(1)) - parseInt(valor2.tipo_dec));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.charCodeAt(1).toFixed(1) - valor2.tipo_dec);
+        } else if(valor2.value === 'boolean'){
+          console.log("Error: No puede restar valores booleanos con caracteres");
+          return new Variable(null,null);
+        } else if(valor2.value === 'char'){
+          console.log("Error: No puede restar caracteres");
+          return new Variable(null,null);
+        } else{
+          //cadena
+          console.log("Error: No puede restar valores caracteres con cadenas");
+          return new Variable(null,null);
+        }
+      } else{
+        //cadena
+        console.log("Error: No puede restar cadenas con ningun tipo de valor");
+        return new Variable(null,null);
+      }
+    }else if (signo === "*") {
+      if(valor1.value === 'int'){
+        if(valor2.value === 'int'){
+        return new Variable('int',parseInt(valor1.tipo_dec) * parseInt(valor2.tipo_dec));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) * valor2.tipo_dec);
+        } else if(valor2.value === 'boolean'){
+          console.log("Error: No puede multiplicar valores enteros con booleanos");
+          return new Variable(null,null);
+        } else if(valor2.value === 'char'){
+          return new Variable('int',parseInt(valor1.tipo_dec) * valor2.tipo_dec.charCodeAt(1));
+        } else{
+          //cadena
+          console.log("Error: No puede multiplicar valores enteros con cadenas");
+          return new Variable(null,null);
+        }
+      } else if(valor1.value === 'double'){
+        if(valor2.value === 'int'){
+        return new Variable('double',valor1.tipo_dec * valor2.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) * valor2.tipo_dec.toFixed(1));
+        } else if(valor2.value === 'boolean'){
+          console.log("Error: No puede multiplicar valores double con booleanos");
+          return new Variable(null,null);
+        } else if(valor2.value === 'char'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) * valor2.tipo_dec.charCodeAt(1).toFixed(1));
+        } else{
+          //cadena
+          console.log("Error: No puede multiplicar valores double con cadenas");
+          return new Variable(null,null);
+        }
+      } else if(valor1.value === 'boolean'){
+        console.log("Error: No puede multiplicar ningun tipo de valor con un booleano");
+        return new Variable(null,null);
+      } else if(valor1.value === 'char'){
+        if(valor2.value === 'int'){
+          return new Variable('int',parseInt(valor1.tipo_dec.charCodeAt(1)) * parseInt(valor2.tipo_dec));
+        } else if(valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.charCodeAt(1).toFixed(1) * valor2.tipo_dec);
+        } else if(valor2.value === 'boolean'){
+          console.log("Error: No puede multiplicar caracteres con booleanos");
+          return new Variable(null,null);
+        } else if(valor2.value === 'char'){
+          console.log("Error: No puede multiplicar caracteres");
+          return new Variable(null,null);
+        } else{
+          //cadena
+          console.log("Error: No puede multiplicar caracteres con cadenas");
+          return new Variable(null,null);
+        }
+      } else{
+        //cadena
+        console.log("Error: No puede multiplicar cadenas");
+        return new Variable(null,null);
+      }
+    }else if (signo === "/"){
+      if(valor2.value !== 0){
+        if(valor1.value === 'int'){
+          if(valor2.value === 'int'){
+          return new Variable('int',parseInt(valor1.tipo_dec) / parseInt(valor2.tipo_dec));
+          } else if(valor2.value === 'double'){
+            return new Variable('double',valor1.tipo_dec.toFixed(1) / valor2.tipo_dec);
+          } else if(valor2.value === 'boolean'){
+            console.log("Error: No puede dividir valores enteros con booleanos");
+            return new Variable(null,null);
+          } else if(valor2.value === 'char'){
+            return new Variable('double',((valor1.tipo_dec) / valor2.tipo_dec.charCodeAt(1)).toFixed(1));
+          } else{
+            //cadena
+            console.log("Error: No puede dividir valores enteros con cadenas");
+            return new Variable(null,null);
           }
-        }
-        if(expression.value2 instanceof Operacion || expression.value2 instanceof Negativo){
-          if(expression.value1 instanceof Valor){
-            return parseInt(expression.value1.valor) - this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
-          }else{
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) - this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
+        } else if(valor1.value === 'double'){
+          if(valor2.value === 'int'){
+          return new Variable('double',valor1.tipo_dec * valor2.tipo_dec.toFixed(1));
+          } else if(valor2.value === 'double'){
+            return new Variable('double',valor1.tipo_dec.toFixed(1) * valor2.tipo_dec.toFixed(1));
+          } else if(valor2.value === 'boolean'){
+            console.log("Error: No puede dividir valores double con booleanos");
+            return new Variable(null,null);
+          } else if(valor2.value === 'char'){
+            return new Variable('double',valor1.tipo_dec.toFixed(1) * valor2.tipo_dec.charCodeAt(1).toFixed(1));
+          } else{
+            //cadena
+            console.log("Error: No puede dividir valores double con cadenas");
+            return new Variable(null,null);
           }
-        }
-        if(expression.value1 instanceof Valor && expression.value2 instanceof Valor){
-            return parseInt(expression.value1.valor) - parseInt(expression.value2.valor);
-        }
-      } else if (expression.signo === "/") {
-      } else if (expression.signo === "*") {
-        if(expression.value1 instanceof Operacion || expression.value1 instanceof Negativo){
-          if(expression.value2 instanceof Valor){
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) * parseInt(expression.value2.valor);
-          }else{
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) * this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
+        } else if(valor1.value === 'boolean'){
+          console.log("Error: No puede dividir ningun tipo de valor con un booleano");
+          return new Variable(null,null);
+        } else if(valor1.value === 'char'){
+          if(valor2.value === 'int'){
+            return new Variable('double',(parseInt(valor1.tipo_dec.charCodeAt(1)) + parseInt(valor2.tipo_dec)).toFixed(1));
+          } else if(valor2.value === 'double'){
+            return new Variable('double',valor1.tipo_dec.charCodeAt(1).toFixed(1) + valor2.tipo_dec);
+          } else if(valor2.value === 'boolean'){
+            console.log("Error: No puede dividir caracteres con booleanos");
+            return new Variable(null,null);
+          } else if(valor2.value === 'char'){
+            console.log("Error: No puede dividir caracteres");
+            return new Variable(null,null);
+          } else{
+            //cadena
+            console.log("Error: No puede dividir caracteres con cadenas");
+            return new Variable(null,null);
           }
+        } else{
+          //cadena
+          console.log("Error: No puede dividir cadenas");
+          return new Variable(null,null);
         }
-        if(expression.value2 instanceof Operacion || expression.value2 instanceof Negativo){
-          if(expression.value1 instanceof Valor){
-            return parseInt(expression.value1.valor) * this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
-          }else{
-            return this.arithmetic(expression.value1,blockRow,blockCol,blockArray) * this.arithmetic(expression.value2,blockRow,blockCol,blockArray);
+      }else{
+        console.log("Error: No puede dividir entre cero");
+        return new Variable(null,null);
+      }
+    }else if (signo === "^"){
+      if(valor1.value === 'int'){
+        if(valor2.value === 'int'){
+          let singleValue = parseInt(valor1.value);
+          for(let i = 0; i < parseInt(valor2.value); i++){
+            valor1.value = valor1.value * singleValue;
           }
+          return new Variable('int',valor1.value);
+        } else if(valor2.value === 'double'){
+          let singleValue = parseInt(valor1.value);
+          for(let i = 0; i < parseInt(valor2.value); i++){
+            valor1.value = valor1.value.toFixed(1) * singleValue.toFixed(1);
+          }
+          return new Variable('double',valor1.value);
+        } else{
+          console.log("Error: No puede hacer una potenciación si los valores no son numéricos");
+          return new Variable(null,null);
         }
-        if(expression.value1 instanceof Valor && expression.value2 instanceof Valor){
-            return parseInt(expression.value1.valor) * parseInt(expression.value2.valor);
+      } else if(valor1.value === 'double'){
+        if(valor2.value === 'int'){
+          let singleValue = parseInt(valor1.value);
+          for(let i = 0; i < parseInt(valor2.value); i++){
+            valor1.value = valor1.value.toFixed(1) * singleValue.toFixed(1);
+          }
+          return new Variable('double',valor1.value);
+        } else if(valor2.value === 'double'){
+          let singleValue = parseInt(valor1.value);
+          for(let i = 0; i < parseInt(valor2.value); i++){
+            valor1.value = valor1.value.toFixed(1) * singleValue.toFixed(1);
+          }
+          return new Variable('double',valor1.value);
+        } else{
+          console.log("Error: No puede hacer una potenciación si los valores no son numéricos");
+          return new Variable(null,null);
         }
-      } else if (expression.signo === "^") {
-      } else if (expression.signo === "%") {
+      } else{
+        console.log("Error: No puede hacer una potenciación si los valores no son numéricos");
+        return new Variable(null,null);
+      }
+    }else{
+      //Modulo
+      if(valor1.value === 'int'){
+        if(valor2.value === 'int' || valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) % valor2.tipo_dec.toFixed(1));
+        } else{
+          console.log("Error: No puede realizar un modulo si el valor no es numérico");
+          return new Variable(null,null);
+        }
+      } else if(valor1.value === 'double'){
+        if(valor2.value === 'int' || valor2.value === 'double'){
+          return new Variable('double',valor1.tipo_dec.toFixed(1) % valor2.tipo_dec.toFixed(1));
+        } else{
+          console.log("Error: No puede realizar un modulo si el valor no es numérico");
+          return new Variable(null,null);
+        }
+      } else{
+        console.log("Error: No puede realizar un modulo si el valor no es numérico");
+        return new Variable(null,null);
+      }
+    }
+  }
+
+  arithmeticValues(value1,value2,blockRow,blockCol,blockArray,signo){
+    if(value1 instanceof Operacion || value1 instanceof Negativo){
+      if(value2 instanceof Valor){
+        let single = this.arithmetic(value1,blockRow,blockCol,blockArray);
+        //console.log(single);
+        return this.arithmeticReturn(single,new Variable(value2.tipo,value2.valor),signo);
+      }else if(value2 instanceof Id){
+        let returned = this.returnValue(value2,blockRow,blockCol,blockArray);
+        let single = this.arithmetic(value1,blockRow,blockCol,blockArray);
+        return this.arithmeticReturn(single,returned,signo);
+      }else{
+        let single1 = this.arithmetic(value1,blockRow,blockCol,blockArray);
+        let single2 = this.arithmetic(value2,blockRow,blockCol,blockArray)
+        return this.arithmeticReturn(single1,single2,signo);
+      }
+    }
+    return null;
+  }
+
+  arithmetic(expression,blockRow,blockCol,blockArray) {
+    //console.log(expression);
+    if (expression instanceof Operacion) {
+      if(this.arithmeticValues(expression.value1,expression.value2,blockRow,blockCol,blockArray,expression.signo) !== null){
+        return this.arithmeticValues(expression.value1,expression.value2,blockRow,blockCol,blockArray,expression.signo);
+      } else if(this.arithmeticValues(expression.value2,expression.value1,blockRow,blockCol,blockArray,expression.signo) !== null){
+        return this.arithmeticValues(expression.value2,expression.value1,blockRow,blockCol,blockArray,expression.signo);
+      } else if(expression.value1 instanceof Valor && expression.value2 instanceof Valor){
+        return this.arithmeticReturn(new Variable(expression.value1.tipo,expression.value1.valor),new Variable(expression.value2.tipo,expression.value2.valor),expression.signo);
+      } else if(expression.value1 instanceof Id && expression.value2 instanceof Valor){
+        return this.arithmeticReturn(this.returnValue(expression.value1,blockRow,blockCol,blockArray),new Variable(expression.value2.tipo,expression.value2.valor),expression.signo);
+      } else if(expression.value1 instanceof Valor && expression.value2 instanceof Id){
+        return this.arithmeticReturn(new Variable(expression.value1.tipo,expression.value1.valor),this.returnValue(expression.value2,blockRow,blockCol,blockArray),expression.signo);
+      } else{
+        //Ambos id
+        let returned1 = this.returnValue(expression.value1,blockRow,blockCol,blockArray);
+        let returned2 = this.returnValue(expression.value2,blockRow,blockCol,blockArray);
+        return this.arithmeticReturn(returned1,returned2,expression.signo);
       }
     } else {
       //Negativo
       if(expression.value instanceof Valor){
-        return ((parseInt(expression.value.valor))*(-1));
+        if(expression.value.tipo === 'int'){
+          return (new Variable(expression.value.tipo,(parseInt(expression.value.valor))*(-1)));
+        }else{
+          let result = ((expression.value.valor)*(-1));
+          return (new Variable(expression.value.tipo,result.toFixed(1)));
+        }
       }else{
-        return ((this.arithmetic(expression.value,blockRow,blockCol,blockArray))*(-1));
+        if(expression.value.tipo === 'int'){
+          return ((this.arithmetic(expression.value,blockRow,blockCol,blockArray))*(-1))
+        }else{
+          let result = ((this.arithmetic(expression.value,blockRow,blockCol,blockArray))*(-1));
+          return (new Variable(expression.value.tipo,result.toFixed(1)));
+        }
       }
     }
   }
@@ -607,33 +905,33 @@ class Interprete {
   relational(expression,blockRow,blockCol,blockArray){
     let value1 = expression.value1;
     let value2 = expression.value2;
-    
+    //console.log(expression);
     if(value1 === null || value2 === null){
       console.log("Error: En la comparación que intenta hacer, un valor es nulo");
       return null;
     } else if(expression.type == 'IGUAL_IGUAL'){
       if(this.relationalValidate(value1,value2)){
-        if(value1.value === value2.value){return true;}else{return false;}
+        if(value1.tipo_dec === value2.tipo_dec){return true;}else{return false;}
       }else{console.log('Error: Los tipos de validacion no coinciden');return null;}
     } else if(expression.type === 'DIFERENTE_IGUAL'){
       if(this.relationalValidate(value1,value2)){
-        if(value1.value !== value2.value){return true;}else{return false;}
+        if(value1.tipo_dec !== value2.tipo_dec){return true;}else{return false;}
       }else{console.log('Error: Los tipos de validacion no coinciden');return null;}
     } else if(expression.type === 'MENOR'){
       if(this.relationalValidate(value1,value2)){
-        if(value1.value < value2.value){return true;}else{return false;}
+        if(value1.tipo_dec < value2.tipo_dec){return true;}else{return false;}
       }else{console.log('Error: Los tipos de validacion no coinciden');return null;}
     } else if(expression.type === 'MENOR_IGUAL'){
       if(this.relationalValidate(value1,value2)){
-        if(value1.value <= value2.value){return true;}else{return false;}
+        if(value1.tipo_dec <= value2.tipo_dec){return true;}else{return false;}
       }else{console.log('Error: Los tipos de validacion no coinciden');return null;}
     } else if(expression.type === 'MAYOR'){
       if(this.relationalValidate(value1,value2)){
-        if(value1.value > value2.value){return true;}else{return false;}
+        if(value1.tipo_dec > value2.tipo_dec){return true;}else{return false;}
       }else{console.log('Error: Los tipos de validacion no coinciden');return null;}
     } else{
       if(this.relationalValidate(value1,value2)){
-        if(value1.value >= value2.value){return true;}else{return false;}
+        if(value1.tipo_dec >= value2.tipo_dec){return true;}else{return false;}
       }else{console.log('Error: Los tipos de validacion no coinciden');return null;}
     } 
   }
@@ -641,7 +939,7 @@ class Interprete {
   relationalValidate(value1,value2){
     //console.log(typeof value1);
     //console.log(typeof value2);
-    if(value1.tipo_var === value2.tipo_var){
+    if(value1.value === value2.value){
       return true;
     } else{
       return false;
@@ -649,12 +947,13 @@ class Interprete {
   }
 
   returnValue(expression,blockRow,blockCol,blockArray){
+    //console.log(expression);
     if(expression instanceof Valor){
-      if(expression.tipo === 'int'){return new Variable('int',parseInt(expression.valor),'varible');}
-      else if(expression.tipo === 'string' || expression.tipo === 'char'){return new Variable('string',expression.valor.toString(),'varible');}
-      else if(expression.tipo === 'boolean'){return new Variable('boolean',(expression.valor === 'true'),'varible');}
-      else if(expression.tipo === 'double'){return new Variable('double',parseFloat(expression.valor),'varible');}
-      return null;
+      if(expression.tipo === 'int'){return new Variable('int',parseInt(expression.valor),'variable');}
+      else if(expression.tipo === 'string'){return new Variable('string',expression.valor.toString(),'varible');}
+      else if(expression.tipo === 'boolean'){return new Variable('boolean',(expression.valor === 'true'),'variable');}
+      else if(expression.tipo === 'double'){return new Variable('double',parseFloat(expression.valor),'variable');}
+      else{return new Variable('char',expression.valor.toString(),'varible');}
     }else if(expression instanceof Id){
       for (let i = 0; i < blockArray.length; i++) {
         if(this.foundVariable(blockArray[i],blockArray[i].variables,expression.valor,blockRow,blockCol) !== null){
@@ -666,7 +965,8 @@ class Interprete {
       }
       return null;
     }else if(expression instanceof Operacion) {
-      return new Variable('int',this.arithmetic(expression,blockRow,blockCol,blockArray),'variable');
+      let result = this.arithmetic(expression,blockRow,blockCol,blockArray);
+      return new Variable('int',result.tipo_dec,'variable');
     }else if(expression instanceof AccesoArraySimple){
       let found = this.generalFoundVariable(blockArray,expression.id,blockRow,blockCol);
       if(found === null){return null;}
@@ -747,6 +1047,81 @@ class Interprete {
           return new Variable(found.tipo,found.valor,found.tipoVar);    
         } else{console.log("Error: La variable a la que quiere cambiar su cantidad, no es numérica");}
       }else{console.log("Error: La variable a la que le quiere cambiar el valor, aún no está declarada");}
+    }else if(expression instanceof Casteo){
+      let found2 = this.returnValue(expression.valor,blockRow,blockCol,blockArray);
+      if(found2 !== null){
+        //int a string
+        if(expression.tipo === 'string' && found2.value === 'int'){
+          console.log("Valor casteado de int a string");
+          return new Variable(expression.tipo,found2.tipo_dec.toString(),'variable');
+        //int a double
+        } else if(expression.tipo === 'double' && found2.value === 'int'){
+          console.log("Valor casteado de int a double");
+          return new Variable(expression.tipo,(found2.tipo_dec).toFixed(1),'variable');
+        //double a int
+        } else if(expression.tipo === 'int' && found2.value === 'double'){
+          console.log("Valor casteado de double a int");
+          return new Variable(expression.tipo,parseInt(found2.tipo_dec, 10),'variable');
+        //double a string
+        } else if(expression.tipo === 'string' && found2.value === 'double'){
+          console.log("Valor casteado de double a string");
+          return new Variable(expression.tipo,found2.tipo_dec.toString(),'variable');
+        //int a char
+        } else if(expression.tipo === 'char' && found2.value === 'int'){
+          console.log("Valor casteado de int a char");
+          return new Variable(expression.tipo,String.fromCharCode(found2.tipo_dec),'variable');
+        //char a int
+        } else if(expression.tipo === 'int' && found2.value === 'char'){
+          console.log("Valor casteado de char a int");
+          return new Variable(expression.tipo,(found2.tipo_dec.charCodeAt(1)),'variable');
+        //char a double
+        } else if(expression.tipo === 'double' && found2.value === 'char'){
+          console.log("Valor casteado de char a double");
+          return new Variable(expression.tipo,found2.tipo_dec.charCodeAt(1).toFixed(1),'variable');
+        }else{console.log("Error: El tipo de casteo que desea realizar es incorrecto");}
+      } else{console.log("Error: El valor " + expression.valor + " no pudo ser casteado");return null;}
+    }else if(expression instanceof Operacion) {
+      let single1 = this.returnValue(expression.value1,blockRow,blockCol,blockArray);
+      let single2 = this.returnValue(expression.value2,blockRow,blockCol,blockArray);
+      if(single1.value === 'int' && single2.value === 'int' || single1.value === 'boolean' && single2.value === 'boolean'){
+        return new Variable(single1.value,this.arithmetic(instruction.value.value,blockRow,blockCol,blockArray),'variable');
+      }else{
+        return new Variable(single1.value,this.printText(instruction.value.value),'variable');
+      }
+    }else if(expression instanceof Negativo) {
+      return new Variable('int',this.arithmetic(expression,blockRow,blockCol,blockArray),'variable');
+    }else if(expression instanceof nuevoArraySimple){
+      let returned = this.returnValue(expression.expresion,blockRow,blockCol,blockArray);
+      return new Variable(expression.tipo,this.fillDefaultArray(expression.tipo,returned.tipo_dec,null,'simple'),'array');
+    }else if(expression instanceof nuevoArrayDoble){
+      let returned1 = this.returnValue(expression.expresion1,blockRow,blockCol,blockArray);
+      let returned2 = this.returnValue(expression.expresion2,blockRow,blockCol,blockArray);
+      return new Variable(expression.tipo,this.fillDefaultArray(expression.tipo,returned1.tipo_dec,returned2.tipo_dec,'doble'),'array_doble');
+    }else if(expression instanceof NuevoArray){
+      //console.log(expression);
+      let valores = [];
+      let typeValue = "";
+      if(expression.lista.length !== 0){
+        typeValue = expression.lista[0].tipo;
+      }
+      for (let i = 0; i < expression.lista.length; i++) {
+        if(typeValue !== expression.lista[i].tipo){console.log("Error: Ha asignado valores de diferente tipo a una lista");return null;}
+        let returned = this.returnValue(expression.lista[i],blockRow,blockCol,blockArray);
+        valores.push(returned.tipo_dec);
+      }
+      return new Variable(typeValue,valores,'array');
+    }else if(expression instanceof Relacional){
+      let value1 = this.returnValue(expression.value1,blockRow,blockCol,blockArray);
+      let value2 = this.returnValue(expression.value2,blockRow,blockCol,blockArray);
+      return new Variable('boolean',this.relational(new Relacional(value1,value2,expression.type)),'variable');
+    }else if(expression instanceof Ternario){
+      let result = this.returnValue(expression.condicion,blockRow,blockCol,blockArray);
+      //console.log(result);
+      if(result.tipo_dec){
+        return this.returnValue(expression.exp1,blockRow,blockCol,blockArray);
+      }else{
+        return this.returnValue(expression.exp2,blockRow,blockCol,blockArray);
+      }
     }
     return null;
   }
@@ -838,14 +1213,16 @@ class Interprete {
   asignationValue(type,instruction,blockArray,blockFound,typeVar,blockRow,blockCol){
     if (instruction.value.value instanceof Operacion) {
       if(typeVar === 1){
-        if(type === 'int' || type === 'double'){
-          let newVariable = new VariableRun(type, instruction.value.tipo_var, this.arithmetic(instruction.value.value,blockRow,blockCol,blockArray),'variable');
-          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-        }else if(type === 'string'){
-          let newVariable = new VariableRun(type, instruction.value.tipo_var, this.printText(instruction.value.value),'variable');
-          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-        } else{
-          console.log("Error: Está intentando asignar contenidos de tipo incorrectos en variables");
+        let result = this.arithmetic(instruction.value.value,blockRow,blockCol,blockArray);
+        if(result !== null){
+          if(type === result.value){
+            let newVariable = new VariableRun(type, instruction.value.tipo_var,result.tipo_dec,'variable');
+            this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+          } else{
+            console.log("Error: Está intentando asignar contenidos de tipo incorrectos en variables");
+          }
+        }else{
+          console.log("Error: No se ha podido realizar la operación");
         }
       } else if(typeVar === 2){
         console.log("Error: No puede asignar un solo valor a un vector");
@@ -900,32 +1277,49 @@ class Interprete {
       }
     } else if(instruction.value.value instanceof Casteo){
       if(typeVar === 1){
-        let found2 = this.generalFoundVariable(blockArray,instruction.value.value.valor.valor,blockRow,blockCol);
+        //console.log(instruction);
+        let found2 = this.returnValue(instruction.value.value.valor,blockRow,blockCol,blockArray)
         if(found2 !== null){
           if (type === instruction.value.value.tipo) {
             //int a string
-            if(instruction.value.value.tipo === 'string' && found2.tipo === 'int'){
-              let newVariable = new VariableRun(type, instruction.value.tipo_var, found2.valor.toString(),'variable');
+            //console.log(instruction.value.value.tipo + " =? " + found2.value);
+            if(instruction.value.value.tipo === 'string' && found2.value === 'int'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var, found2.tipo_dec.toString(),'variable');
               this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-              console.log("Variable casteada de int a string");
+              console.log("Valor casteado de int a string");
             //int a double
-            } else if(instruction.value.value.tipo === 'double' && found2.tipo === 'int'){
-              let newVariable = new VariableRun(type, instruction.value.tipo_var,(found2.valor).toFixed(1),'variable');
+            } else if(instruction.value.value.tipo === 'double' && found2.value === 'int'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var,(found2.tipo_dec).toFixed(1),'variable');
               this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-              console.log("Variable casteada de int a double");
+              console.log("Valor casteado de int a double");
             //double a int
-            } else if(instruction.value.value.tipo === 'int' && found2.tipo === 'double'){
-              let newVariable = new VariableRun(type, instruction.value.tipo_var,parseInt(found2.valor, 10),'variable');
+            } else if(instruction.value.value.tipo === 'int' && found2.value === 'double'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var,parseInt(found2.tipo_dec, 10),'variable');
               this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-              console.log("Variable casteada de double a int");
+              console.log("Valor casteado de double a int");
             //double a string
-          } else if(instruction.value.value.tipo === 'string' && found2.tipo === 'double'){
-            let newVariable = new VariableRun(type, instruction.value.tipo_var,found2.valor.toString(),'variable');
-            this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
-            console.log("Variable casteada de double a string");
-          }
-          } else{console.log("Error: Quiere asignar un casteo de una variable tipo " + instruction.value.value.tipo + " en una tipo " + type);}
-        } else{console.log("Error: El id " + instruction.value.value.valor.valor + " no existe");}
+            } else if(instruction.value.value.tipo === 'string' && found2.value === 'double'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var,found2.tipo_dec.toString(),'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+              console.log("Valor casteado de double a string");
+            //int a char
+            } else if(instruction.value.value.tipo === 'char' && found2.value === 'int'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var,String.fromCharCode(found2.tipo_dec),'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+              console.log("Valor casteado de int a char");
+            //char a int
+            } else if(instruction.value.value.tipo === 'int' && found2.value === 'char'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var,(found2.tipo_dec.charCodeAt(1)),'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+              console.log("Valor casteado de char a int");
+            //char a double
+            } else if(instruction.value.value.tipo === 'double' && found2.value === 'char'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var,found2.tipo_dec.charCodeAt(1).toFixed(1),'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+              console.log("Valor casteado de char a double");
+            }else{console.log("Error: El tipo de casteo que desea realizar es incorrecto");}
+          }else{console.log("Error: Quiere asignar un casteo de una variable tipo " + instruction.value.value.tipo + " en una tipo " + type);}
+        }else{console.log("Error: El valor " + instruction.value.value.valor.valor + " no pudo ser casteado");}
       } else if(typeVar === 2){
         console.log("Error: No puede asignar un solo valor a un vector");
       } else{
@@ -976,7 +1370,22 @@ class Interprete {
         let newVariable = new VariableRun(type, instruction.value.tipo_var,valores,'array');
         this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
       } else{
-        console.log("Error: No puede asignar una lista a un vector doble");
+        if(instruction.value.value.lista[0] instanceof NuevoArray){
+          let valores = [];
+          let longitud = instruction.value.value.lista[0].lista.length;
+          for (let i = 0; i < instruction.value.value.lista.length; i++) {
+            if(instruction.value.value.lista[i] instanceof NuevoArray){
+              let returned = this.returnValue(instruction.value.value.lista[i],blockRow,blockCol,blockArray);
+              if(type === returned.value){
+                if(returned.tipo_dec.length === longitud){
+                  valores.push(returned.tipo_dec);
+                }else{console.log("Error: Todas las listas que desea asignar al vector doble deben de ser equivalentes");}
+              }else{console.log("Error: Está asignando un valor tipo " + returned.value + " a una lista tipo " + type);}
+            }else{console.log("Error: La asignación que trata de hacer al vector doble no es correcta");}
+          }
+          let newVariable = new VariableRun(type, instruction.value.tipo_var,valores,'array_doble');
+          this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+        }else{console.log("Error: No puede asignar una lista a un vector doble");}
       }
     } else if(instruction.value.value instanceof AccesoArraySimple){
       if(typeVar === 1){
@@ -1092,6 +1501,38 @@ class Interprete {
       }else{
         //Funciones predeterminadas
       }
-    }
+    } else if(instruction.value.value instanceof Ternario) {
+      if(typeVar === 1){
+        let found = this.returnValue(instruction.value.value,blockRow,blockCol,blockArray);
+        if(found !== null){
+          if(found.value === type){
+            if(found.var_tipo === 'variable'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var, found.tipo_dec, 'variable');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+            }else{console.log("Error: El valor que trata asignar no corresponde con las dimensiones de la variable");}
+          } else{console.log("Error: El valor asignado no corresponde con el tipo de variable");}
+        } else{console.log("Error: No se pudo asignar el operador ternario a la variable");}
+      } else if(typeVar === 2){
+        let found = this.returnValue(instruction.value.value,blockRow,blockCol,blockArray);
+        if(found !== null){
+          if(found.value === type){
+            if(found.var_tipo === 'array'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var, found.tipo_dec, 'array');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+            }else{console.log("Error: El valor que trata asignar no corresponde con las dimensiones de la variable");}
+          } else{console.log("Error: El valor asignado no corresponde con el tipo de variable");}
+        } else{console.log("Error: No se pudo asignar el operador ternario a la variable");}
+      } else{
+        let found = this.returnValue(instruction.value.value,blockRow,blockCol,blockArray);
+        if(found !== null){
+          if(found.value === type){
+            if(found.var_tipo === 'array_doble'){
+              let newVariable = new VariableRun(type, instruction.value.tipo_var, found.tipo_dec, 'array_doble');
+              this.addVariable(blockArray,blockFound.fila,blockFound.columna,newVariable);
+            }else{console.log("Error: El valor que trata asignar no corresponde con las dimensiones de la variable");}
+          } else{console.log("Error: El valor asignado no corresponde con el tipo de variable");}
+        } else{console.log("Error: No se pudo asignar el operador ternario a la variable");}
+      }
+    } 
   }
 }
